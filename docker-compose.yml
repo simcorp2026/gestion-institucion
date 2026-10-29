@@ -1,0 +1,60 @@
+name: gestion-institucion
+
+services:
+
+  postgres:
+    image: postgres:17.7
+    container_name: gestion-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: academic
+    volumes:
+      - "postgres_data_academic:/var/lib/postgresql/data"
+    ports:
+      - "54321:5432"
+
+  academic-service:
+    image: pablofernandosimbana/academic-service:latest
+    build:
+      context: ./academic-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+    container_name: academic-service
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/academic
+      QUARKUS_DATASOURCE_USERNAME: postgres
+      QUARKUS_DATASOURCE_PASSWORD: postgres
+      QUARKUS_HTTP_PORT: "8080"
+      APP_INSTANCE_ID: academic-service
+    ports:
+      - "8081:8080"
+
+
+  analytics-service:
+    image: pablofernandosimbana/analytics-service:latest
+    build:
+      context: ./analytics-service
+      dockerfile: src/main/docker/Dockerfile.jvm
+    container_name: analytics-service
+    environment:
+      QUARKUS_REST_CLIENT_ACADEMIC_API_URL: http://academic-service:8080
+      QUARKUS_HTTP_PORT: "8080"
+      APP_INSTANCE_ID: analytics-service
+    ports:
+      - "8082:8080"
+
+  web-app:
+    image: pablofernandosimbana/web-app:latest
+    build:
+      context: ./web-app
+      dockerfile: Dockerfile
+    container_name: web-app
+    depends_on:
+      - analytics-service
+      - academic-service
+    ports:
+      - "3000:8080"
+
+
+volumes:
+  postgres_data_academic:

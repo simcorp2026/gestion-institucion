@@ -1,0 +1,86 @@
+# academic-service: API REST académica (Flyway crea el esquema al arrancar)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: academic-service
+  labels:
+    app: academic-service
+    app.kubernetes.io/part-of: gestion-institucion
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: academic-service
+  template:
+    metadata:
+      labels:
+        app: academic-service
+    spec:
+      containers:
+        - name: academic-service
+          image: docker.io/pablofernandosimbana/academic-service:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: gestion-config
+          env:
+            - name: QUARKUS_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: POSTGRES_USER }
+            - name: QUARKUS_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-credentials, key: POSTGRES_PASSWORD }
+            # /instance devuelve el nombre del pod -> evidencia de balanceo entre réplicas
+            - name: APP_INSTANCE_ID
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+          startupProbe:
+            httpGet: { path: /q/health/started, port: http }
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            httpGet: { path: /q/health/ready, port: http }   # incluye chequeo del datasource
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /q/health/live, port: http }
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: [ALL] }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: academic-service
+  labels:
+    app: academic-service
+spec:
+  selector:
+    app: academic-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Route opcional: expone Swagger UI y /instance para evidencias
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: academic-service
+  labels:
+    app: academic-service
+spec:
+  to:
+    kind: Service
+    name: academic-service
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

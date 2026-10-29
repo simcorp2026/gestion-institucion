@@ -1,0 +1,28 @@
+# Configuración compartida: credenciales (Secret) y parámetros no sensibles (ConfigMap)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  labels:
+    app.kubernetes.io/part-of: gestion-institucion
+type: Opaque
+stringData:
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: postgres
+  POSTGRES_DB: academic
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gestion-config
+  labels:
+    app.kubernetes.io/part-of: gestion-institucion
+data:
+  # academic-service
+  QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://postgres:5432/academic
+  # analytics-service
+  QUARKUS_REST_CLIENT_ACADEMIC_API_URL: http://academic-service:8080
+  RISK_THRESHOLD: "7.0"
+  RISK_MAX_FAILED: "2"
+  # común
+  QUARKUS_HTTP_PORT: "8080"
